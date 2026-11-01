@@ -5,6 +5,8 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.preferencesDataStoreFile
 import com.demomart.register.net.PosRepository
 import com.demomart.register.net.RetrofitPosRepository
+import com.demomart.register.receipt.DataStoreReceiptCounter
+import com.demomart.register.receipt.ReceiptCounter
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -19,6 +21,9 @@ import javax.inject.Singleton
 abstract class DataModule {
     @Binds
     abstract fun posRepository(impl: RetrofitPosRepository): PosRepository
+
+    @Binds
+    abstract fun receiptCounter(impl: DataStoreReceiptCounter): ReceiptCounter
 
     companion object {
         @Provides @Singleton
