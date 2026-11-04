@@ -1,6 +1,7 @@
 package com.demomart.register
 
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -13,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
@@ -20,6 +22,12 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.demomart.register.auth.AuthTokenProvider
 import com.demomart.register.auth.LoginScreen
+import com.demomart.register.identify.IdentifyScreen
+import com.demomart.register.identify.IdentifyViewModel
+import com.demomart.register.identify.NfcReader
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.demomart.register.sale.AmountScreen
 import com.demomart.register.sale.SaleFlowState
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -31,6 +39,7 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
     @Inject lateinit var auth: AuthTokenProvider
     @Inject lateinit var flow: SaleFlowState
+    private val nfcReader by lazy { NfcReader(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -54,17 +63,40 @@ class MainActivity : ComponentActivity() {
                             onSignOut = auth::signOut,
                         )
                     }
-                    composable("identify") {
-                        BackHandler {
+                    composable("identify") { entry ->
+                        val model: IdentifyViewModel = hiltViewModel()
+                        val back = {
                             flow.setCustomer(null)
                             nav.popBackStack()
+                            Unit
                         }
-                        Placeholder("Scan loyalty card")
+                        BackHandler(onBack = back)
+                        DisposableEffect(entry, model) {
+                            val observer = LifecycleEventObserver { _, event ->
+                                when (event) {
+                                    Lifecycle.Event.ON_RESUME -> {
+                                        model.setNfcAvailability(nfcReader.availability())
+                                        nfcReader.start(model::onNfc)
+                                    }
+                                    Lifecycle.Event.ON_PAUSE -> nfcReader.stop()
+                                    else -> Unit
+                                }
+                            }
+                            entry.lifecycle.addObserver(observer)
+                            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                            onDispose {
+                                entry.lifecycle.removeObserver(observer)
+                                nfcReader.stop()
+                                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                            }
+                        }
+                        val amount by flow.amountCents.collectAsStateWithLifecycle()
+                        IdentifyScreen(amount, onBack = back, onIdentified = { nav.navigate("sale") }, model)
                     }
                     composable("sale") {
                         BackHandler {
                             flow.setCustomer(null)
-                            nav.popBackStack()
+                            nav.navigate("identify") { popUpTo("identify") { inclusive = true } }
                         }
                         Placeholder("Confirm sale")
                     }
