@@ -2,7 +2,7 @@
 
 Demo cash register for Android. The cashier enters an amount, reads the customer's loyalty card over NFC (DemoMart app) or by QR, redeems points and commits the sale. Recent sales can be refunded.
 
-Kotlin, Jetpak Compose, Hilt, Retrofit, CameraX + ML Kit.
+Kotlin, Jetpack Compose, Hilt, Retrofit, CameraX + ML Kit.
 
 ## Build
 
