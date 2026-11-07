@@ -30,7 +30,7 @@ class DataStoreReceiptCounter @Inject constructor(
     override suspend fun sync(): ApiResult<Long> {
         val result = repo.nextReceipt()
         if (result is ApiResult.Ok) {
-            store.edit { prefs -> prefs[NEXT] = result.value }
+            store.edit { prefs -> prefs[NEXT] = maxOf(next(prefs), result.value) }
         }
         return result
     }

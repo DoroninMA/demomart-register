@@ -43,6 +43,15 @@ class ReceiptCounterTest {
         assertEquals(128L, counter.current())
     }
 
+    @Test fun keepsLocalWhenAhead() = runTest {
+        val counter = counter(backgroundScope)
+        next = ApiResult.Ok(130L)
+        counter.sync()
+        next = ApiResult.Ok(128L)
+        assertEquals(ApiResult.Ok(128L), counter.sync())
+        assertEquals(130L, counter.current())
+    }
+
     @Test fun advanceIncrements() = runTest {
         val job = Job()
         val first = counter(CoroutineScope(backgroundScope.coroutineContext + job))
