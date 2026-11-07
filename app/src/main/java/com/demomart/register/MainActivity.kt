@@ -30,6 +30,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.demomart.register.sale.AmountScreen
 import com.demomart.register.sale.SaleFlowState
+import com.demomart.register.sale.SaleScreen
+import com.demomart.register.sale.ResultScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.demomart.register.ui.theme.DemoMartRegisterTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -64,6 +66,10 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     composable("identify") { entry ->
+                        if (flow.amountCents.value <= 0) {
+                            LaunchedEffect(Unit) { nav.popBackStack("amount", inclusive = false) }
+                            return@composable
+                        }
                         val model: IdentifyViewModel = hiltViewModel()
                         val back = {
                             flow.setCustomer(null)
@@ -94,15 +100,32 @@ class MainActivity : ComponentActivity() {
                         IdentifyScreen(amount, onBack = back, onIdentified = { nav.navigate("sale") }, model)
                     }
                     composable("sale") {
-                        BackHandler {
-                            flow.setCustomer(null)
-                            nav.navigate("identify") { popUpTo("identify") { inclusive = true } }
+                        if (flow.amountCents.value <= 0) {
+                            LaunchedEffect(Unit) { nav.popBackStack("amount", inclusive = false) }
+                        } else {
+                            val backToIdentify = {
+                                flow.setCustomer(null)
+                                nav.navigate("identify") { popUpTo("identify") { inclusive = true } }
+                            }
+                            SaleScreen(
+                                onIdentify = backToIdentify,
+                                onAmount = { nav.popBackStack("amount", inclusive = false) },
+                                onResult = {
+                                    nav.navigate("result") { popUpTo("amount") { inclusive = true } }
+                                },
+                            )
                         }
-                        Placeholder("Confirm sale")
                     }
                     composable("result") {
                         BackHandler {}
-                        Placeholder("Sale complete")
+                        val newSale = {
+                            nav.navigate("amount") { popUpTo("result") { inclusive = true } }
+                        }
+                        if (flow.lastResult.value == null) {
+                            LaunchedEffect(Unit) { newSale() }
+                        } else {
+                            ResultScreen(onNewSale = newSale)
+                        }
                     }
                     composable("recent") { Placeholder("Recent sales") }
                 }
