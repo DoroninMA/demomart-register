@@ -6,17 +6,10 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -32,6 +25,7 @@ import com.demomart.register.sale.AmountScreen
 import com.demomart.register.sale.SaleFlowState
 import com.demomart.register.sale.SaleScreen
 import com.demomart.register.sale.ResultScreen
+import com.demomart.register.sales.RecentSalesScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.demomart.register.ui.theme.DemoMartRegisterTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -127,7 +121,7 @@ class MainActivity : ComponentActivity() {
                             ResultScreen(onNewSale = newSale)
                         }
                     }
-                    composable("recent") { Placeholder("Recent sales") }
+                    composable("recent") { RecentSalesScreen(onBack = { nav.popBackStack() }) }
                 }
                 LaunchedEffect(nav) {
                     auth.signedIn.collect { signedIn ->
@@ -141,16 +135,6 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
-        }
-    }
-}
-
-
-@Composable
-private fun Placeholder(text: String) {
-    Surface {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(text)
         }
     }
 }
