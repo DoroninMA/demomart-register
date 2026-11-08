@@ -86,6 +86,8 @@ tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(verify
 tasks.matching { it.name == "preDebugBuild" }.configureEach { dependsOn(verifyDebugConfig) }
 
 dependencies {
+    implementation(libs.bcprov)
+    implementation(libs.bcpkix)
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.icons)

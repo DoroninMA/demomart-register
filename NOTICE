@@ -1,0 +1,8 @@
+DemoMart register
+
+This product includes code derived from the Google Wallet Smart Tap sample app.
+Copyright 2022 Google LLC. Licensed under the Apache License, Version 2.0.
+The code was ported to Kotlin and restructured for DemoMart.
+
+Source: https://github.com/kmandalas/smart-tap-sample-app/tree/192d1760bd8f44e8142dda6611c2a1314b35595b
+License: LICENSES/Apache-2.0.txt
