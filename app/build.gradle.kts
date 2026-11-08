@@ -1,3 +1,4 @@
+import java.util.Base64
 import java.net.URI
 import java.util.Properties
 
@@ -28,11 +29,32 @@ val debugUrl = serverUrl("loyalty.serverUrl", "http://10.0.2.2:8000/")
 val releaseUrl = serverUrl("loyalty.releaseServerUrl")
 val debugMode = providers.gradleProperty("loyalty.authMode").orElse("fake").get()
 
+val collectorId = local.getProperty("loyalty.smartTap.collectorId", "0").trim().toLongOrNull()
+    ?: error("loyalty.smartTap.collectorId must be an unsigned 32-bit integer")
+require(collectorId in 0..0xffff_ffffL) { "loyalty.smartTap.collectorId must be an unsigned 32-bit integer" }
+val smartTapVersion = if (collectorId == 0L) 0 else {
+    val version = local.getProperty("loyalty.smartTap.keyVersion")?.trim()?.toLongOrNull()
+    require(version != null && version in 0..0xffff_ffffL) {
+        "loyalty.smartTap.keyVersion must be an unsigned 32-bit integer"
+    }
+    version.toInt()
+}
+val smartTapPem = if (collectorId == 0L) "" else {
+    val path = local.getProperty("loyalty.smartTap.keyFile")?.trim().orEmpty()
+    require(path.isNotEmpty()) { "Set loyalty.smartTap.keyFile to a PEM file" }
+    val keyFile = rootProject.file(path)
+    require(keyFile.isFile) { "loyalty.smartTap.keyFile must point to a PEM file" }
+    Base64.getEncoder().encodeToString(keyFile.readBytes())
+}
+
 android {
     namespace = "com.demomart.register"
     compileSdk = 37
 
     defaultConfig {
+        buildConfigField("long", "SMART_TAP_COLLECTOR_ID", "${collectorId}L")
+        buildConfigField("int", "SMART_TAP_KEY_VERSION", smartTapVersion.toString())
+        buildConfigField("String", "SMART_TAP_PRIVATE_KEY_PEM_B64", quoted(smartTapPem))
         applicationId = "com.demomart.register"
         minSdk = 26
         targetSdk = 37
