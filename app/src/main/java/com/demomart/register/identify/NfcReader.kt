@@ -8,12 +8,29 @@ import android.nfc.Tag
 import android.nfc.tech.IsoDep
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
+import com.demomart.register.BuildConfig
+import com.demomart.register.smarttap.SmartTapConfig
+import com.demomart.register.smarttap.SmartTapCrypto
+import com.demomart.register.smarttap.SmartTapReader
+import com.demomart.register.smarttap.Transceiver
 import java.io.IOException
 
 enum class NfcAvailability { Ready, Disabled, Unsupported }
 
+fun readTag(card: Transceiver, smartTap: SmartTapReader?): NfcReadResult = try {
+    val hce = ApduCodec.parse(card.transceive(ApduCodec.selectCommand()))
+    if (hce == NfcReadResult.AppNotFound && smartTap != null) smartTap.read(card) else hce
+} catch (_: IOException) {
+    NfcReadResult.Failure(-1)
+}
+
 class NfcReader(private val activity: Activity) {
     private val adapter = NfcAdapter.getDefaultAdapter(activity)
+    private val smartTap = runCatching { SmartTapConfig.fromBuildConfig() }
+        .onFailure { Log.w("SmartTap", "Invalid terminal configuration") }
+        .getOrNull()?.let { SmartTapReader(it, SmartTapCrypto()) }
+    private val verboseLog = BuildConfig.DEBUG && BuildConfig.SMART_TAP_COLLECTOR_ID == 20180608L
     private val main = Handler(Looper.getMainLooper())
     private var generation = 0
     private var active = false
@@ -52,8 +69,23 @@ class NfcReader(private val activity: Activity) {
         return try {
             isoDep.use {
                 it.connect()
-                it.timeout = 2000
-                ApduCodec.parse(it.transceive(ApduCodec.selectCommand()))
+                it.timeout = if (smartTap == null) 2000 else 3000
+                val started = System.nanoTime()
+                val result = readTag(Transceiver { apdu ->
+                    it.transceive(apdu).also { response ->
+                        if (verboseLog && response.size >= 2) {
+                            val ins = apdu[1].toInt() and 0xff
+                            val sw = ((response[response.size - 2].toInt() and 0xff) shl 8) or
+                                (response.last().toInt() and 0xff)
+                            Log.d("SmartTap", "APDU ${ins.toString(16)} -> ${sw.toString(16)}")
+                        }
+                    }
+                }, smartTap)
+                if (verboseLog && result == NfcReadResult.Token("2018")) {
+                    val elapsedMs = (System.nanoTime() - started) / 1_000_000
+                    Log.d("SmartTap", "SmartTap value: 2018 (${elapsedMs}ms)")
+                }
+                result
             }
         } catch (_: IOException) {
             NfcReadResult.Failure(-1)

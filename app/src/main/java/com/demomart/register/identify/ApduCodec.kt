@@ -4,6 +4,7 @@ sealed interface NfcReadResult {
     data class Token(val text: String) : NfcReadResult
     data object NotSignedIn : NfcReadResult
     data object AppNotFound : NfcReadResult
+    data object WalletUnreadable : NfcReadResult
     data class Failure(val sw: Int) : NfcReadResult
 }
 

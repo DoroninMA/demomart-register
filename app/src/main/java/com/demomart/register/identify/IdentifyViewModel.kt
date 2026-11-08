@@ -63,6 +63,7 @@ class IdentifyViewModel @Inject constructor(
             is NfcReadResult.Token -> onScanned(result.text)
             NfcReadResult.NotSignedIn -> showError("Customer not signed in")
             NfcReadResult.AppNotFound -> showError("Customer app not found")
+            NfcReadResult.WalletUnreadable -> showError("Card in Google Wallet couldn't be read")
             is NfcReadResult.Failure -> showError("Hold the phone still and try again")
         }
     }

@@ -74,6 +74,8 @@ android {
         }
     }
 
+    packaging.resources.pickFirsts.add("META-INF/LICENSE.md")
+
     buildFeatures {
         buildConfig = true
         compose = true
