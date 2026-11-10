@@ -58,7 +58,7 @@ The Smart Tap reader (`smarttap/`) is a Kotlin port of Google's Smart Tap sample
 
 | Pay over NFC | Pay by QR |
 |---|---|
-| <img src="docs/nfc_payment.gif" width="300"> | <img src="docs/qr_payment.gif" width="220"> |
+| <img src="docs/nfc_payment.webp" width="300"> | <img src="docs/qr_payment.webp" width="220"> |
 
 ## License
 
