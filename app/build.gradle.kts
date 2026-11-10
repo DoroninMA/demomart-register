@@ -69,6 +69,10 @@ android {
             buildConfigField("String", "AUTH_MODE", quoted(debugMode))
         }
         release {
+            // local testing on a phone: -Ployalty.debugSignedRelease=true
+            if (providers.gradleProperty("loyalty.debugSignedRelease").isPresent) {
+                signingConfig = signingConfigs.getByName("debug")
+            }
             buildConfigField("String", "SERVER_URL", quoted(releaseUrl))
             buildConfigField("String", "AUTH_MODE", quoted("firebase"))
         }
