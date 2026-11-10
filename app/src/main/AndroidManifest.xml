@@ -9,6 +9,7 @@
         android:name=".RegisterApp"
         android:allowBackup="false"
         android:label="DemoMart Register"
+        android:icon="@mipmap/ic_launcher"
         android:networkSecurityConfig="@xml/network_security_config"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
