@@ -11,6 +11,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
 
@@ -21,7 +22,7 @@ class RecentSalesViewModelTest {
     private val newer = sampleSale(receipt = 128, createdAt = "2026-11-09T15:02:00Z")
     private var refund: ApiResult<SaleResult> = ApiResult.Ok(first.copy(status = "refunded", balance = 1355))
     private val repo = object : StubPosRepository() {
-        override suspend fun recentSales() = ApiResult.Ok(listOf(first, newer))
+        override suspend fun recentSales(before: SaleResult?) = ApiResult.Ok(listOf(first, newer))
         override suspend fun refund(receiptNo: Long): ApiResult<SaleResult> {
             assertEquals(first.receiptNo, receiptNo)
             return refund
@@ -65,5 +66,36 @@ class RecentSalesViewModelTest {
             "Nov 9, 17:02 · Anna K. · €18.00 · +18 / −500 pts",
             saleRowText(first, ZoneOffset.ofHours(3), LocalDate.of(2026, 11, 10)),
         )
+    }
+
+    @Test fun loadMoreAppendsPagesUntilShort() = runTest {
+        val all = (45L downTo 1L).map { sampleSale(receipt = it).copy(saleId = it) }
+        val paged = object : StubPosRepository() {
+            override suspend fun recentSales(before: SaleResult?): ApiResult<List<SaleResult>> {
+                val start = if (before == null) 0 else all.indexOf(before) + 1
+                return ApiResult.Ok(all.drop(start).take(20))
+            }
+        }
+        val model = RecentSalesViewModel(paged)
+        advanceUntilIdle()
+        model.loadMore()
+        advanceUntilIdle()
+        model.loadMore()
+        advanceUntilIdle()
+        assertEquals(all, model.state.value.items)
+        assertFalse(model.state.value.hasMore)
+    }
+
+    @Test fun loadMoreIgnoresRepeatedPage() = runTest {
+        val page = (20L downTo 1L).map { sampleSale(receipt = it).copy(saleId = it) }
+        val stuck = object : StubPosRepository() {
+            override suspend fun recentSales(before: SaleResult?) = ApiResult.Ok(page)
+        }
+        val model = RecentSalesViewModel(stuck)
+        advanceUntilIdle()
+        model.loadMore()
+        advanceUntilIdle()
+        assertEquals(page, model.state.value.items)
+        assertFalse(model.state.value.hasMore)
     }
 }

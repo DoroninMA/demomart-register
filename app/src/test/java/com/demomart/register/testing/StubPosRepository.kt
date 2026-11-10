@@ -13,6 +13,6 @@ open class StubPosRepository : PosRepository {
     override suspend fun commit(receiptNo: Long, customerRef: String?, amountCents: Long, redeemPoints: Long): ApiResult<SaleResult> =
         error("Unexpected commit")
     override suspend fun refund(receiptNo: Long): ApiResult<SaleResult> = error("Unexpected refund")
-    override suspend fun recentSales(): ApiResult<List<SaleResult>> = error("Unexpected recentSales")
+    override suspend fun recentSales(before: SaleResult?): ApiResult<List<SaleResult>> = error("Unexpected recentSales")
     override suspend fun nextReceipt(): ApiResult<Long> = error("Unexpected nextReceipt")
 }

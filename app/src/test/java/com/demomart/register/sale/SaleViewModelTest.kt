@@ -43,7 +43,7 @@ class SaleViewModelTest {
             return commitAnswer
         }
 
-        override suspend fun recentSales() = recentAnswer
+        override suspend fun recentSales(before: SaleResult?) = recentAnswer
     }
 
     @Test fun initialQuoteSetsMax() = runTest {

@@ -10,9 +10,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -25,6 +28,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,6 +48,8 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 
 private val timeFormat = DateTimeFormatter.ofPattern("HH:mm", Locale.ROOT)
 private val dateFormat = DateTimeFormatter.ofPattern("MMM d", Locale.ENGLISH)
@@ -65,6 +72,15 @@ fun saleRowText(
 fun RecentSalesScreen(onBack: () -> Unit, model: RecentSalesViewModel = hiltViewModel()) {
     val state by model.state.collectAsStateWithLifecycle()
     var confirmRefund by rememberSaveable { mutableStateOf<Long?>(null) }
+    val listState = rememberLazyListState()
+    LaunchedEffect(listState, state.hasMore, state.items.size) {
+        if (!state.hasMore) return@LaunchedEffect
+        // fetch the next page a few rows before the end
+        snapshotFlow { listState.layoutInfo.run { (visibleItemsInfo.lastOrNull()?.index ?: 0) >= totalItemsCount - 6 } }
+            .distinctUntilChanged()
+            .filter { it }
+            .collect { model.loadMore() }
+    }
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -77,6 +93,7 @@ fun RecentSalesScreen(onBack: () -> Unit, model: RecentSalesViewModel = hiltView
         PullToRefreshBox(state.loading, model::refresh, Modifier.fillMaxSize().padding(padding)) {
             LazyColumn(
                 Modifier.fillMaxSize(),
+                state = listState,
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -86,9 +103,16 @@ fun RecentSalesScreen(onBack: () -> Unit, model: RecentSalesViewModel = hiltView
                 if (state.items.isEmpty() && !state.loading && state.error == null) {
                     item { Text("No sales yet") }
                 }
-                items(state.items, key = { it.saleId }) { sale ->
+                items(state.items, key = { it.saleId }, contentType = { "sale" }) { sale ->
                     SaleRow(sale, enabled = !state.loading && state.refunding == null) {
                         confirmRefund = sale.receiptNo
+                    }
+                }
+                if (state.loadingMore) {
+                    item(key = "more") {
+                        Box(Modifier.fillMaxWidth().padding(8.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+                        }
                     }
                 }
             }
@@ -112,7 +136,7 @@ private fun SaleRow(sale: SaleResult, enabled: Boolean, onRefund: () -> Unit) {
             Column(Modifier.weight(1f)) {
                 val color = if (refunded) MaterialTheme.colorScheme.onSurfaceVariant
                 else MaterialTheme.colorScheme.onSurface
-                Text(saleRowText(sale), color = color)
+                Text(remember(sale) { saleRowText(sale) }, color = color)
                 if (refunded) Text("Refunded", style = MaterialTheme.typography.labelMedium, color = color)
             }
             if (!refunded) {

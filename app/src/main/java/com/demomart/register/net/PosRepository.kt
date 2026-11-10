@@ -18,7 +18,8 @@ interface PosRepository {
     suspend fun quote(customerRef: String?, amountCents: Long, redeemPoints: Long): ApiResult<QuoteOut>
     suspend fun commit(receiptNo: Long, customerRef: String?, amountCents: Long, redeemPoints: Long): ApiResult<SaleResult>
     suspend fun refund(receiptNo: Long): ApiResult<SaleResult>
-    suspend fun recentSales(): ApiResult<List<SaleResult>>
+    // before: the last sale already shown, to fetch the page after it
+    suspend fun recentSales(before: SaleResult? = null): ApiResult<List<SaleResult>>
     suspend fun nextReceipt(): ApiResult<Long>
 }
 
@@ -39,7 +40,8 @@ class RetrofitPosRepository @Inject constructor(
 
     override suspend fun refund(receiptNo: Long) = request { api.refund(RefundIn(registerId, receiptNo)) }
 
-    override suspend fun recentSales() = request { api.recentSales(registerId) }
+    override suspend fun recentSales(before: SaleResult?) =
+        request { api.recentSales(registerId, beforeAt = before?.createdAt, beforeId = before?.saleId) }
 
     override suspend fun nextReceipt(): ApiResult<Long> = when (val result = request { api.nextReceipt(registerId) }) {
         is ApiResult.Ok -> ApiResult.Ok(result.value.nextReceiptNo)
