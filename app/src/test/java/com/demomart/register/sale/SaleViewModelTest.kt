@@ -100,16 +100,31 @@ class SaleViewModelTest {
         assertEquals("Receipt number clash, please retry", model.state.value.error)
     }
 
-    @Test fun lowerMaxClampsRedeem() = runTest {
+    @Test fun redeemIsCalculatedLocally() = runTest {
         val model = SaleViewModel(repo, counter, flow)
         advanceUntilIdle()
-        max = 300
-        model.setRedeem(1300)
+        model.setRedeem(500)
+        val quote = model.state.value.quote!!
+        assertEquals(listOf(0L), quoted)
+        assertEquals(500L, quote.redeemPoints)
+        assertEquals(500L, quote.discountCents)
+        assertEquals(1800L, quote.paidCents)
+        assertEquals(18L, quote.earnPoints)
+        assertEquals(1300L, quote.maxRedeemPoints)
+    }
+
+    @Test fun commitRejectedForPointsRefreshesMax() = runTest {
+        val model = SaleViewModel(repo, counter, flow)
         advanceUntilIdle()
-        assertEquals(listOf(0L, 1300L, 0L, 300L), quoted)
-        assertEquals(300L, model.state.value.redeemPoints)
-        assertEquals(300L, model.state.value.quote?.redeemPoints)
-        assertNull(model.state.value.error)
+        model.setRedeem(1300)
+        max = 300
+        commitAnswer = ApiResult.Err("insufficient_points", "")
+        model.confirm()
+        advanceUntilIdle()
+        assertEquals(0L, model.state.value.redeemPoints)
+        assertEquals(300L, model.state.value.quote?.maxRedeemPoints)
+        assertEquals("Not enough points", model.state.value.error)
+        assertFalse(model.state.value.busy)
     }
 
     @Test fun noCustomerHidesRedeemAndCommitsNullRef() = runTest {
@@ -125,11 +140,18 @@ class SaleViewModelTest {
 
     @Test fun confirmDisabledWhileQuoting() = runTest {
         val model = SaleViewModel(repo, counter, flow)
+        model.confirm()
+        advanceUntilIdle()
+        assertTrue(committed.isEmpty())
+    }
+
+    @Test fun confirmRightAfterRedeemCommitsIt() = runTest {
+        val model = SaleViewModel(repo, counter, flow)
         advanceUntilIdle()
         model.setRedeem(500)
         model.confirm()
         advanceUntilIdle()
-        assertTrue(committed.isEmpty())
+        assertEquals(500L, committed.single().redeem)
     }
 
     @Test fun redeemLockedWhileRetryPending() = runTest {

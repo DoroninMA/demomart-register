@@ -12,7 +12,6 @@ import com.demomart.register.receipt.ReceiptCounter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -34,6 +33,12 @@ data class SaleState(
         get() = !quoting && !busy && !canRetry && quote?.redeemPoints == redeemPoints
 }
 
+// Same rules as the server: 100 points = €1, 1 point per paid euro
+internal fun localQuote(base: QuoteOut, redeem: Long): QuoteOut {
+    val paid = base.amountCents - redeem
+    return base.copy(redeemPoints = redeem, discountCents = redeem, paidCents = paid, earnPoints = paid / 100)
+}
+
 @HiltViewModel
 class SaleViewModel @Inject constructor(
     private val repo: PosRepository,
@@ -52,27 +57,28 @@ class SaleViewModel @Inject constructor(
     private var quoteJob: Job? = null
     private var pending: PendingSale? = null
 
-    init { requestQuote(0, debounce = false) }
+    init { requestQuote(0) }
 
     fun setRedeem(points: Long) {
         val sale = state.value
-        if (sale.busy || sale.canRetry || sale.customer == null) return
-        val max = sale.quote?.maxRedeemPoints ?: return
-        val redeem = points.coerceIn(0, max) / 100 * 100
-        if (redeem != sale.redeemPoints) requestQuote(redeem, debounce = true)
+        if (sale.busy || sale.canRetry || sale.quoting || sale.customer == null) return
+        val quote = sale.quote ?: return
+        val redeem = points.coerceIn(0, quote.maxRedeemPoints) / 100 * 100
+        if (redeem != sale.redeemPoints) {
+            mutableState.value = sale.copy(redeemPoints = redeem, quote = localQuote(quote, redeem), error = null)
+        }
     }
 
     fun retryQuote() {
         val sale = state.value
-        if (!sale.quoting && !sale.busy && !sale.canRetry) requestQuote(sale.redeemPoints, debounce = false)
+        if (!sale.quoting && !sale.busy && !sale.canRetry) requestQuote(sale.redeemPoints)
     }
 
-    private fun requestQuote(points: Long, debounce: Boolean) {
+    private fun requestQuote(points: Long, error: String? = null) {
         quoteJob?.cancel()
         val sale = state.value
-        mutableState.value = sale.copy(redeemPoints = points, quoting = true, error = null)
+        mutableState.value = sale.copy(redeemPoints = points, quoting = true, error = error)
         quoteJob = viewModelScope.launch {
-            if (debounce) delay(200)
             val ref = sale.customer?.customerRef
             val first = repo.quote(ref, sale.amountCents, points)
             val response = if (first is ApiResult.Err && first.code == "insufficient_points" && points > 0) {
@@ -91,7 +97,7 @@ class SaleViewModel @Inject constructor(
                     val quote = response.value
                     val reduced = minOf(quote.redeemPoints, quote.maxRedeemPoints)
                     mutableState.value = state.value.copy(quote = quote, quoting = false)
-                    if (reduced != quote.redeemPoints) requestQuote(reduced, debounce = false)
+                    if (reduced != quote.redeemPoints) requestQuote(reduced, state.value.error)
                 }
                 is ApiResult.Err -> {
                     mutableState.value = state.value.copy(quote = null, quoting = false)
@@ -135,6 +141,11 @@ class SaleViewModel @Inject constructor(
                     showError(errorText(response.code))
                 }
                 "customer_ref_expired" -> rescan()
+                "insufficient_points", "redeem_exceeds_amount" -> {
+                    pending = null
+                    mutableState.value = state.value.copy(busy = false)
+                    requestQuote(0, errorText(response.code))
+                }
                 else -> {
                     pending = null
                     showError(errorText(response.code))
