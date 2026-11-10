@@ -1,8 +1,23 @@
-# DemoMart Register
+<p align="center"><img src="docs/icon.svg" width="120" alt="App icon"></p>
+
+<h1 align="center">DemoMart Register</h1>
+
+<p align="center">Part of <a href="https://github.com/DoroninMA/demomart"><b>DemoMart</b></a>, a demo loyalty card system</p>
 
 Demo cash register for Android. The cashier enters an amount, reads the customer's loyalty card over NFC (DemoMart app or Google Wallet via Smart Tap) or by QR, redeems points and commits the sale. Recent sales can be refunded.
 
 Kotlin, Jetpack Compose, Hilt, Retrofit, CameraX + ML Kit.
+
+## Screenshots
+
+<p align="center">
+<img src="docs/amount.jpg" width="150">
+<img src="docs/scan-qr.jpg" width="150">
+<img src="docs/review.jpg" width="150">
+<img src="docs/result-earn.jpg" width="150">
+<img src="docs/result-redeem.jpg" width="150">
+<img src="docs/recent-sales.jpg" width="150">
+</p>
 
 ## Build
 
@@ -38,6 +53,12 @@ NFC is the default on the scan screen; **Scan QR code** opens the camera. Both c
 ## Smart Tap
 
 The Smart Tap reader (`smarttap/`) is a Kotlin port of Google's Smart Tap sample app, Apache License 2.0. See `NOTICE` and `LICENSES/`.
+
+## Demo
+
+| Pay over NFC | Pay by QR |
+|---|---|
+| <img src="docs/nfc_payment.gif" width="300"> | <img src="docs/qr_payment.gif" width="220"> |
 
 ## License
 
