@@ -11,12 +11,18 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -75,12 +81,9 @@ fun IdentifyScreen(
     val requestPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         cameraAllowed = it
     }
-    var requested by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        if (!requested && !cameraAllowed) {
-            requested = true
-            requestPermission.launch(Manifest.permission.CAMERA)
-        }
+    val openQr = {
+        model.showQr()
+        if (!cameraAllowed) requestPermission.launch(Manifest.permission.CAMERA)
     }
     LaunchedEffect(model) { model.navigateToSale.collect { onIdentified() } }
 
@@ -99,26 +102,35 @@ fun IdentifyScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text("Sale amount · ${formatEur(amount)}", style = MaterialTheme.typography.titleMedium)
-            when (state.nfc) {
-                NfcAvailability.Ready -> NfcPrompt()
-                NfcAvailability.Disabled -> Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("NFC is off")
-                    TextButton(onClick = { context.startActivity(Intent(Settings.ACTION_NFC_SETTINGS)) }) { Text("Turn on") }
+            if (!state.qrMode) {
+                when (state.nfc) {
+                    null, NfcAvailability.Ready -> NfcPrompt(active = state.nfc == NfcAvailability.Ready && state.readerOn)
+                    NfcAvailability.Disabled -> Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("NFC is off")
+                        TextButton(onClick = { context.startActivity(Intent(Settings.ACTION_NFC_SETTINGS)) }) { Text("Turn on") }
+                    }
+                    NfcAvailability.Unsupported -> Text("NFC not available on this device")
                 }
-                NfcAvailability.Unsupported -> Text("NFC not available on this device, use QR")
-            }
-            Text(if (state.nfc == NfcAvailability.Ready) "or scan the QR code" else "Scan the QR code")
-            if (cameraAllowed) {
-                QrPreview(model::onScanned)
+                Button(onClick = openQr, enabled = state.status != IdentifyStatus.Checking) { Text("Scan QR code") }
             } else {
-                Box(
-                    Modifier.fillMaxWidth().height(150.dp).background(
-                        MaterialTheme.colorScheme.surface, MaterialTheme.shapes.medium,
-                    ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    TextButton(onClick = { requestPermission.launch(Manifest.permission.CAMERA) }) {
-                        Text("Camera permission needed")
+                Text("Scan the QR code")
+                if (cameraAllowed) {
+                    QrPreview(model::onScanned)
+                } else {
+                    Box(
+                        Modifier.fillMaxWidth().height(150.dp).background(
+                            MaterialTheme.colorScheme.surface, MaterialTheme.shapes.medium,
+                        ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        TextButton(onClick = { requestPermission.launch(Manifest.permission.CAMERA) }) {
+                            Text("Camera permission needed")
+                        }
+                    }
+                }
+                if (state.nfc != NfcAvailability.Unsupported) {
+                    TextButton(onClick = model::showNfc, enabled = state.status != IdentifyStatus.Checking) {
+                        Text("Use NFC instead")
                     }
                 }
             }
@@ -145,15 +157,26 @@ fun IdentifyScreen(
 }
 
 @Composable
-private fun NfcPrompt() {
+private fun NfcPrompt(active: Boolean) {
     val pulse by rememberInfiniteTransition(label = "NFC pulse").animateFloat(
         0.4f, 1f, infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "NFC ring",
     )
+    // 0 = idle grey, 1 = active green
+    val level by animateFloatAsState(if (active) 1f else 0f, tween(450), label = "NFC level")
+    val idle = MaterialTheme.colorScheme.outlineVariant
+    val green = MaterialTheme.colorScheme.primary
+    val ring = lerp(idle, green.copy(alpha = pulse), level)
+    val label = lerp(MaterialTheme.colorScheme.outline, green, level)
     Box(
-        Modifier.size(68.dp).border(3.dp, MaterialTheme.colorScheme.primary.copy(alpha = pulse), CircleShape),
+        Modifier.size(68.dp).border(3.dp, ring, CircleShape),
         contentAlignment = Alignment.Center,
-    ) { Text("NFC", color = MaterialTheme.colorScheme.primary) }
-    Text("Hold customer's phone here")
+    ) { Text("NFC", color = label) }
+    // Fixed-width slot so the text does not shift while fading
+    Crossfade(active, Modifier.fillMaxWidth(), animationSpec = tween(450), label = "NFC hint") { on ->
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            Text(if (on) "Hold customer's phone here" else "Starting NFC…")
+        }
+    }
 }
 
 @Composable
@@ -161,7 +184,13 @@ private fun QrPreview(onText: (String) -> Unit) {
     val context = LocalContext.current
     val owner = LocalLifecycleOwner.current
     val callback by rememberUpdatedState(onText)
-    val view = remember { PreviewView(context) }
+    // TextureView mode so the preview can be clipped
+    val view = remember {
+        PreviewView(context).apply {
+            implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+            scaleType = PreviewView.ScaleType.FILL_CENTER
+        }
+    }
     var unavailable by remember { mutableStateOf(false) }
 
     DisposableEffect(owner, view) {
@@ -190,5 +219,12 @@ private fun QrPreview(onText: (String) -> Unit) {
     }
 
     if (unavailable) Text("Camera not available, use NFC")
-    else AndroidView(factory = { view }, modifier = Modifier.fillMaxWidth().height(190.dp))
+    else {
+        val shape = RoundedCornerShape(16.dp)
+        AndroidView(
+            factory = { view },
+            modifier = Modifier.fillMaxWidth(0.8f).aspectRatio(1f).clip(shape)
+                .border(2.dp, MaterialTheme.colorScheme.primary, shape),
+        )
+    }
 }

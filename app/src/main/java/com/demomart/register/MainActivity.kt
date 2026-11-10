@@ -76,9 +76,13 @@ class MainActivity : ComponentActivity() {
                                 when (event) {
                                     Lifecycle.Event.ON_RESUME -> {
                                         model.setNfcAvailability(nfcReader.availability())
-                                        nfcReader.start(model::onNfc)
+                                        if (!model.state.value.qrMode) nfcReader.start(model::onNfc)
+                                        model.setReaderOn(nfcReader.isActive)
                                     }
-                                    Lifecycle.Event.ON_PAUSE -> nfcReader.stop()
+                                    Lifecycle.Event.ON_PAUSE -> {
+                                        nfcReader.stop()
+                                        model.setReaderOn(false)
+                                    }
                                     else -> Unit
                                 }
                             }
@@ -89,6 +93,14 @@ class MainActivity : ComponentActivity() {
                                 nfcReader.stop()
                                 window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                             }
+                        }
+                        val qrMode = model.state.collectAsStateWithLifecycle().value.qrMode
+                        LaunchedEffect(qrMode) {
+                            when {
+                                qrMode -> nfcReader.stop()
+                                entry.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) -> nfcReader.start(model::onNfc)
+                            }
+                            model.setReaderOn(nfcReader.isActive)
                         }
                         val amount by flow.amountCents.collectAsStateWithLifecycle()
                         IdentifyScreen(amount, onBack = back, onIdentified = { nav.navigate("sale") }, model)

@@ -16,6 +16,10 @@ import com.demomart.register.smarttap.SmartTapReader
 import com.demomart.register.smarttap.Transceiver
 import java.io.IOException
 
+internal const val NFC_READER_FLAGS =
+    NfcAdapter.FLAG_READER_NFC_A or NfcAdapter.FLAG_READER_NFC_B or NfcAdapter.FLAG_READER_SKIP_NDEF_CHECK or
+        NfcAdapter.FLAG_READER_NO_PLATFORM_SOUNDS
+
 enum class NfcAvailability { Ready, Disabled, Unsupported }
 
 fun readTag(card: Transceiver, smartTap: SmartTapReader?): NfcReadResult = try {
@@ -34,6 +38,7 @@ class NfcReader(private val activity: Activity) {
     private val main = Handler(Looper.getMainLooper())
     private var generation = 0
     private var active = false
+    val isActive get() = active
 
     fun availability(): NfcAvailability = when {
         adapter == null -> NfcAvailability.Unsupported
@@ -44,16 +49,15 @@ class NfcReader(private val activity: Activity) {
     fun start(onResult: (NfcReadResult) -> Unit) {
         if (adapter == null || active) return
         val current = ++generation
-        val flags = NfcAdapter.FLAG_READER_NFC_A or NfcAdapter.FLAG_READER_SKIP_NDEF_CHECK or
-            NfcAdapter.FLAG_READER_NO_PLATFORM_SOUNDS
         adapter.enableReaderMode(activity, { tag ->
+            if (verboseLog) Log.d("SmartTap", "Tag discovered: ${tag.techList.joinToString()}")
             val result = read(tag)
             activity.runOnUiThread {
                 if (!active || current != generation) return@runOnUiThread
                 if (result is NfcReadResult.Token) beep()
                 onResult(result)
             }
-        }, flags, null)
+        }, NFC_READER_FLAGS, null)
         active = true
     }
 

@@ -24,7 +24,11 @@ sealed interface IdentifyStatus {
 
 data class IdentifyState(
     val status: IdentifyStatus = IdentifyStatus.Waiting,
-    val nfc: NfcAvailability = NfcAvailability.Unsupported,
+    // null until checked on resume
+    val nfc: NfcAvailability? = null,
+    val readerOn: Boolean = false,
+    // NFC reader is off while the camera is open
+    val qrMode: Boolean = false,
 )
 
 @HiltViewModel
@@ -58,7 +62,7 @@ class IdentifyViewModel @Inject constructor(
     }
 
     fun onNfc(result: NfcReadResult) {
-        if (!accepting()) return
+        if (!accepting() || state.value.qrMode) return
         when (result) {
             is NfcReadResult.Token -> onScanned(result.text)
             NfcReadResult.NotSignedIn -> showError("Customer not signed in")
@@ -69,7 +73,21 @@ class IdentifyViewModel @Inject constructor(
     }
 
     fun setNfcAvailability(availability: NfcAvailability) {
-        mutableState.value = state.value.copy(nfc = availability)
+        val qr = state.value.qrMode || availability == NfcAvailability.Unsupported
+        mutableState.value = state.value.copy(nfc = availability, qrMode = qr)
+    }
+
+    fun setReaderOn(on: Boolean) {
+        mutableState.value = state.value.copy(readerOn = on)
+    }
+
+    fun showQr() = setQrMode(true)
+
+    fun showNfc() = setQrMode(false)
+
+    private fun setQrMode(qr: Boolean) {
+        if (state.value.status == IdentifyStatus.Checking) return
+        mutableState.value = state.value.copy(qrMode = qr, status = IdentifyStatus.Waiting)
     }
 
     fun skipCard() {

@@ -41,6 +41,43 @@ class IdentifyViewModelTest {
     private val model = IdentifyViewModel(repo, flow, clock)
     private val token = "DM1:48210093:123456"
 
+    @Test fun startsInNfcModeAndSwitchesToQr() {
+        assertEquals(false, model.state.value.qrMode)
+        model.showQr()
+        assertEquals(true, model.state.value.qrMode)
+        model.showNfc()
+        assertEquals(false, model.state.value.qrMode)
+    }
+
+    @Test fun readyNfcKeepsNfcModeUnsupportedOpensQr() {
+        model.setNfcAvailability(NfcAvailability.Ready)
+        assertEquals(false, model.state.value.qrMode)
+        model.setNfcAvailability(NfcAvailability.Unsupported)
+        assertEquals(true, model.state.value.qrMode)
+    }
+
+    @Test fun nfcUnknownAndReaderOffAtStart() {
+        assertNull(model.state.value.nfc)
+        assertEquals(false, model.state.value.readerOn)
+        model.setReaderOn(true)
+        assertEquals(true, model.state.value.readerOn)
+    }
+
+    @Test fun nfcIgnoredInQrMode() = runTest {
+        model.showQr()
+        model.onNfc(NfcReadResult.Token(token))
+        model.onNfc(NfcReadResult.AppNotFound)
+        runCurrent()
+        assertEquals(emptyList<String>(), codes)
+        assertEquals(IdentifyStatus.Waiting, model.state.value.status)
+    }
+
+    @Test fun switchingModeClearsError() {
+        model.onNfc(NfcReadResult.AppNotFound)
+        model.showQr()
+        assertEquals(IdentifyStatus.Waiting, model.state.value.status)
+    }
+
     @Test fun qrAndNfcTogetherCallIdentifyOnce() = runTest {
         model.onScanned(token)
         model.onNfc(NfcReadResult.Token("DM1:48210093:000000"))

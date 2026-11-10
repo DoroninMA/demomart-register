@@ -21,6 +21,8 @@ Start `demomart-server` (see its README) with `AUTH_MODE=fake` and seed it.
 
 Install with `.\gradlew.bat :app:installDebug`, tap **Demo cashier (Bob)** and sign in with an empty password.
 
+NFC is the default on the scan screen; **Scan QR code** opens the camera. Both can't run at once, some phones stop NFC polling while the camera is on. Debug builds also have a **Paste code** field.
+
 ## Configuration (`local.properties`)
 
 | Key | |
