@@ -23,11 +23,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.demomart.register.money.formatEur
+import com.demomart.register.sound.playSuccessSound
 import com.demomart.register.ui.theme.EarnGreen
 import com.demomart.register.ui.theme.RedeemOrange
 
@@ -38,6 +40,15 @@ fun ResultScreen(onNewSale: () -> Unit, model: ResultViewModel = hiltViewModel()
     val refunded = sale.status == "refunded"
     var confirmRefund by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(model) { model.navigateToAmount.collect { onNewSale() } }
+    val context = LocalContext.current
+    var soundFor by rememberSaveable { mutableStateOf("") }
+    val soundKey = "${sale.receiptNo}:${sale.status}"
+    LaunchedEffect(soundKey) {
+        if (soundFor != soundKey) {
+            soundFor = soundKey
+            playSuccessSound(context)
+        }
+    }
 
     Surface(color = MaterialTheme.colorScheme.background) {
         Column(
